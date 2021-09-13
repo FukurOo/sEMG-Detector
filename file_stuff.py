@@ -81,8 +81,8 @@ def postProcess(relative_file_path,history,model):
   utils.plot_model(model, to_file=(relative_file_path+"/model.png"))
   
   print("\n\n\n\n\n\n\n")
-  print("Finishing up. Procede by executing '. ./execute-me.sh <outfile>'.")
-  command = "mv $1 "+relative_file_path+"/."
+  print("Finishing up. Proceede by executing '. ./execute-me.sh <outfile>'.")
+  command = "mv $1 "+relative_file_path+"/."+" && echo '... proceeding execution ...' && echo 'Done.'"
   write_c_to_file = "echo '"+command+"' > execute-me.sh"
   print()
   os.system(write_c_to_file)

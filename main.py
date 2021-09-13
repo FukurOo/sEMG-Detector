@@ -53,7 +53,7 @@ import training_stuff as NN
 # which we are going to apply to a new neural network.
 training_options = USER.processArguments()
 
-data_file,output_path = MMRY.preProcess(training_options)
+data_file,output_path = MMRY.preProcess(training_options,'MODELS/')
 
 pic_shape, training_data, validation_data, number_of_classes = NN.getTrainingData(data_file,training_options)
 

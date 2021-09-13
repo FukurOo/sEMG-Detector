@@ -39,8 +39,8 @@ Created on Thu Apr  8 10:55:11 2021
 # $ python3 main.py <arg list>   
 # dadurch sehe ich live im terminal wo das Programm ist UND befülle eine Ausgabedatei.
 #
-# mit $ mv <ouftfile> <DEST_PATH>
-# könnte ich post processing mäßig per shell script dann die Datei an den richtigen Platz verschieben.
+# mit $ mv <ouftfile> <DEST_PATH> (so getan in execute-me.sh)
+# wird per post processing die obige Ausgabedatei an den richtigen Platz verschoben.
 # %% 
 
 

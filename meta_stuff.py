@@ -67,7 +67,20 @@ class Meta:
         raise Exception("This case should not occurr!")
     return newObject
       
-        
+  def __getitem__(self, key ) :
+    '''
+    with this method we can create new meta objects like
+     >> new = m1[3:5] <<
+    '''
+    newObject=[]
+    if isinstance(key,slice):
+      newObject = Meta(key.stop-key.start)
+    elif isinstance(key,int):
+      newObject = Meta(1)
+    newObject.iData_ = self.iData_[key]
+    newObject.pData_ = self.pData_[key]
+    #if isinstance( key, slice ) :
+    return newObject  
   
   def add(self,other, start1=0, start2=-1):
     # angepasst für fusionierte probabilistic und integer meta data.

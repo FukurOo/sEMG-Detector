@@ -35,6 +35,7 @@ class Scenario:
     self.time_between_sEMG_samples_ = DT
     self.IED_ = Len/(Elec-1) # inter electrode distance
     self.manager_ = world
+    self.maxWaves_=-1
   
   #def finalize(self):
   #  if self.fin_.min():
@@ -103,6 +104,22 @@ class Scenario:
       self.data_[start:stop_small,:] += smaller.data_
       self.meta_.add(smaller.meta_,0,start)
   
+  def __getitem__(self, key ) :
+    '''
+    with this method we can create new scenarios like
+     >> new = s1[0:5] <<
+    '''
+    newObject = Scenario(self.number_of_electroids_,self.length_of_adhesive_array_,self.time_between_sEMG_samples_,self.manager_)
+    #if isinstance( key, slice ) :
+    newObject.data_ = self.data_[key,:]
+    newObject.meta_ = self.meta_[key]
+      #Get the start, stop, and step from the slice
+    return newObject
+    #elif isinstance( key, int ):
+    #  
+    #else:
+    #    raise TypeError, "Invalid argument type."
+  
   def accumulate(self,start,stop,n_waves,wave_speed,*args):
     # this function fills a specific part of a scenario, between start and stop.
     # N_time, thus must be == stop-start
@@ -147,13 +164,26 @@ class Scenario:
     #print(type(self.meta_))
     #print("meta data size after '__add__': {}".format(self.meta_.size_))
     #self.fin_[mySize:] = True
-      
-        
-  def show(self,start=0,stop=-1,colorbar=True):
+  
+  def maxWaves(self):
+    if self.maxWaves_ == -1:
+      for ts in range(self.data_.shape[0]):
+        ts_max = 0
+        for key in self.meta_.pData_[ts].keys():
+          #key is a specific speed. need do add all speed maxima
+          ts_max += max(self.meta_.pData_[ts][key].values())
+        if ts_max > self.maxWaves_:
+          self.maxWaves_ = ts_max
+    return self.maxWaves_
+
+  def show(self,start=0,stop=0,colorbar=True):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     fig, ax = plt.subplots(1,1)
-    img = ax.imshow(self.data_[start:stop], cmap='gray', vmin=0, vmax=self.data_.max())
+    if stop == 0:
+      img = ax.imshow(self.data_[start:], cmap='gray', vmin=0, vmax=self.data_.max())
+    else:
+      img = ax.imshow(self.data_[start:stop], cmap='gray', vmin=0, vmax=self.data_.max())
     if colorbar:
       fig.colorbar(img)
     if start!=0:

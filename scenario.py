@@ -28,26 +28,20 @@ class Scenario:
     #self.initialized_ = False
     #self.finalized_ = False
     self.id_ = world.get_id()
-    print("Initializing Scenario {}".format(self.id_))
+    #print("Initializing Scenario {}".format(self.id_))
     #self.fin_ = np.array([],dtype=bool)
     self.number_of_electroids_ = Elec
     self.length_of_adhesive_array_ = Len
     self.time_between_sEMG_samples_ = DT
     self.IED_ = Len/(Elec-1) # inter electrode distance
     self.manager_ = world
-    self.maxWaves_=-1
-  
-  #def finalize(self):
-  #  if self.fin_.min():
-  #    self.finalize_=True
-  #  else:
-  #    print("Can't finalize Scenario ID{}. There are unwritten time steps.".format(self.id_))  
+   
           
   def __add__(self,other):
     # __add__ operator for two Scenario objects
     #
     # 1: only makes sense for measurements using the same measure-advise. Thus, otherwise ValueError.
-    # 2: simple superposition, however, we trunkate values over 1.0!
+    # 2: superposition with normalization --> f(x) \in [0,1]
     #
     # returns new Scenario object
     if (self.number_of_electroids_ != other.number_of_electroids_ or self.time_between_sEMG_samples_ != other.time_between_sEMG_samples_):
@@ -62,17 +56,18 @@ class Scenario:
         newObject.data_ = self.data_.copy()
         newObject.data_[:other.data_.shape[0]] += other.data_.copy()
         newObject.meta_.set_size(self.data_.shape[0])
-      newObject.data_=np.minimum(newObject.data_,np.ones(newObject.data_.shape))
+      # newObject.data_=np.minimum(newObject.data_,np.ones(newObject.data_.shape))
+      mxmm = newObject.data_.max()
+      #if mxmm = 0:
+      #  nicht teilen
+      if mxmm > 0 and mxmm != 1.0:
+        # normieren:
+        newObject.data_ /= mxmm
+      #newObject.data_=
       newObject.meta_ = self.meta_ + other.meta_
       return newObject
     
   def set_size(self,T):
-    #if self.finalized_:
-    #  print("You can not change the size of a finalized Scenario! (ID{})".format(self.id_))
-    #else:
-   #if Elec != self.data_.shape[1]:
-   #  print("You may not reset the amount of electroids of an existing Scenario! (ID{})".format(self.id))
-   # else:
     mySize = self.data_.shape[0]
     if T < mySize:
       n_too_much = mySize - T
@@ -87,12 +82,13 @@ class Scenario:
       #print(self.data_.shape[1])
       self.data_ = np.vstack((self.data_,np.zeros((T-mySize,self.data_.shape[1]))))
       self.meta_.set_size(T)
-      #temp = np.array([False]*(T-mySize),dtype=bool)
-      #self.fin_ = np.hstack((self.fin_,temp))
           
   def add(self,smaller,start):
-  # note, that here we only overlap at the end. we can not merge two small ones into a larger one as in Meta
-  # but at least the 'smaller one' doesn't have to be actually smaller..
+    '''
+    fragmentale Methode - wird die noch irgendwo verwendet?
+    '''
+    # note, that here we only overlap at the end. we can not merge two small ones into a larger one as in Meta
+    # but at least the 'smaller one' doesn't have to be actually smaller..
     mySize = self.data_.shape[0]
     smallerSize = smaller.data_.shape[0]
     if (self.data_.shape[1] != smaller.data_.shape[1]):
@@ -115,17 +111,10 @@ class Scenario:
     newObject.meta_ = self.meta_[key]
       #Get the start, stop, and step from the slice
     return newObject
-    #elif isinstance( key, int ):
-    #  
-    #else:
-    #    raise TypeError, "Invalid argument type."
   
   def accumulate(self,start,stop,n_waves,wave_speed,*args):
     # this function fills a specific part of a scenario, between start and stop.
     # N_time, thus must be == stop-start
-    #if self.finalized_:
-    #  print("You can not reset a finalized Scenario! (ID{})".format(self.id_))
-    #else:
     if (stop > self.data_.shape[0]):
       print("You must first enlarge the ndarrays of this Scenario via set_size()! (ID{})".format(self.id))
     else:
@@ -137,7 +126,6 @@ class Scenario:
       #print("wave_speed = {}".format(wave_speed))
       self.data_[start:stop,:] += data_plus
       self.meta_.add(meta_plus,0,start)
-      #self.fin_[start:stop] = True
         
   def compute_speed_variation(self,v,l,gap_vec,crit):
     #print("In compute_speed_variation: kind = {}".format(self.meta_.kind_))
@@ -166,15 +154,16 @@ class Scenario:
     #self.fin_[mySize:] = True
   
   def maxWaves(self):
-    if self.maxWaves_ == -1:
-      for ts in range(self.data_.shape[0]):
-        ts_max = 0
-        for key in self.meta_.pData_[ts].keys():
-          #key is a specific speed. need do add all speed maxima
-          ts_max += max(self.meta_.pData_[ts][key].values())
-        if ts_max > self.maxWaves_:
-          self.maxWaves_ = ts_max
-    return self.maxWaves_
+    max_waves = 0
+    for ts in range(self.data_.shape[0]):
+      ts_max = 0
+      for key in self.meta_.pData_[ts].keys():
+        #print(self.meta_.pData_[ts])
+        #key is a specific speed. need to add all speed maxima
+        ts_max += max(self.meta_.pData_[ts][key].keys())
+      if ts_max > max_waves:
+        max_waves = ts_max
+    return max_waves
 
   def show(self,start=0,stop=0,colorbar=True):
     plt.rc('text', usetex=True)
@@ -284,7 +273,7 @@ class Scenario:
       n_waves = number_of_waves_per_speed_and_timei
     
     # create a cycler for distinct line styles of up to (8*4*5=160) different speeds:
-    my_cycler = (cycler(color=['r', 'g', 'b', 'y','c','m','y','k']) * cycler(linewidth=[1,2,3,4]) * cycler(linestyle=['-', '--', ':', '-.', '.']))
+    my_cycler = (cycler(color=['r', 'g', 'b', 'y','c','m','y','k']) * cycler(linewidth=[1,2,3,4]) * cycler(linestyle=['-', '--','-.', ':',(0,(3,5,1,5)),(0,(3,10,1,10,1,10))]))
     plt.rc('lines')
     plt.rc('axes', prop_cycle=my_cycler)
     plt.gca().invert_yaxis()
@@ -299,8 +288,49 @@ class Scenario:
     plt.show()
       
       
+  def analyse(self):
+    '''
+    Visualisierung des Scenarios. es soll sichtbar sein, wann wieviele Wellen im System sind (einzelne keys und kumuliert)..
+    rechts ist das sEMG Bild, links der Info-Graf.
+    '''
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    
+    fig, (ax2, ax1) = plt.subplots(nrows=1, ncols=2, sharey=False, gridspec_kw={'width_ratios': [3, 1]})
+    fig.suptitle("Scenario {}".format(self.id_))
+    
+    # sEMG picture: 
+    img = ax1.imshow(self.data_[:], cmap='gray', vmin=0, vmax=self.data_.max())
+    ax1.set_ylabel("time step number")
+    ax1.set_xlabel("electrode number")
+    fig.colorbar(img,ax=ax1)
+    
+    # contained information:
+    N_time = self.data_.shape[0]
+    time = np.linspace(0,N_time*self.time_between_sEMG_samples_,N_time)
+    number_of_waves_per_speed_and_timei,number_of_waves_per_speed_and_timep, speed_list = self.meta_.get_vecs()
+    n_waves = number_of_waves_per_speed_and_timei
+    cumulated_waves = []
+    # all keys seperate
+    my_cycler = (cycler(linestyle=['-', '--','-.', ':',(0,(3,5,1,5)),(0,(3,10,1,10,1,10))]) * cycler(linewidth=[1,2,3,4]) * cycler(color=['r', 'g', 'b', 'y','c','m','y','k']))
+    plt.rc('lines')
+    plt.rc('axes', prop_cycle=my_cycler)
+    ax2.invert_yaxis()
+    for i in range(len(speed_list)):
+      ax2.plot(n_waves[i],time,label="v = "+str(speed_list[i]))
+    
+    # all together:
+    for ts in range(len(n_waves[0])):
+      cumulated_waves.append(sum(self.meta_.iData_[ts].values()))
+    ax2.plot(cumulated_waves,time,label="cumulative")
+    
+    ax2.set_ylim([time[-1],time[0]])
+    ax2.legend()
+    ax2.set_ylabel("time [s]")
+    ax2.set_xlabel("number of waves")
       
-      
+    
+    plt.show()
       
       
       

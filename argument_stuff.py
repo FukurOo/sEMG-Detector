@@ -1,14 +1,26 @@
- 
+'''
+Zur besseren(?) Handhabung der main-Datei sind alle Commandline-Argumente
+benannt und müssen nicht in einer spezifischen Reihenfolge stehen (aber immer
+als key value - Paar direkt hintereinander). Sollen mehr Argumente eingepflegt
+werden, muss das zum einen hier getan werden. Die Nutzung dieser neuen Argumente
+muss entsprechend im späteren Programmablauf erfolgen.
+'''
+
+
 import sys
 
 def errorAndExit():
+  '''
+  Wenn das main Programm nicht ordnungsgemäß aufgerufen wird, informieren wir
+  den Nutzer, was von ihm erwartet wird.
+  '''
   print("Please specify the following arguments as: python3 main.py <key_1 value_1> ... <key_7 value_7>")
   print("The keys are:")
   print('  "AR"  (int): the neural network architecture')
-  print('  "GT" (char): the kind of data interpretation. integer (i) or probabilistic (p)')
-  print('  "CL" (char): the way classes are defined. granular (g) or direct (d)') 
+  print('  "GT" (char): the kind of data interpretation. integer (i) [or probabilistic (p) -- not completely implemented ]')
+  print('  "CL" (char): the way classes are defined. manual/granular mode (m or g) or auto/direct mode (a or d)') 
   print('  "S"   (int): the number of sections to be used')
-  print('  "G" (float): the granularity if CL=g, otherwise meaningless(?!)')
+  print('  "B" (float): the number of bricks to be used if CL=g or m. Otherwise autodetermined, however, please mention something..')
   print('  "EP"  (int): the number of epochs to be used for the training')
   print('  "TS"  (int): the number of time steps that define a picture')
   print('  "DT" (char): the filename of the training data')
@@ -22,7 +34,7 @@ def  printArgs(args):
   print("  the kind of data interpretation,   GT = '{}'".format(args['GT']))
   print("  the way classes are defined,       CL = '{}'".format(args['CL'])) 
   print("  the number of sections to be used,  S = {}".format(args['S']))
-  print("  the granularity,                    G = {}".format(args['G']))
+  print("  the number of bricks to be used,    B = {}".format(args['B']))
   print("  the number of epochs to be used,   EP = {}".format(args['EP']))
   print("  the number of time steps per pic., TS = {}".format(args['TS']))
   print("  the filename of the training data, DT = '{}'".format(args['DT']))
@@ -65,23 +77,27 @@ def processArguments():
       print("Program terminating.")
       sys.exit(1)
   if ('CL' in arguments):
-    if arguments['CL'] not in ['g','d']:
-      print("{} is not a valid value for 'CL', the way classes are defined. Must be 'g' (granular) or 'd' (direct).".format(arguments['CL']))
+    if arguments['CL'] not in ['g','d','a','m']:
+      print("{} is not a valid value for 'CL', the way classes are defined. Must be 'g' or 'm' (granular) or 'd' or 'a' (direct).".format(arguments['CL']))
       print("Program terminating.")
       sys.exit(1)
-    elif (arguments['S']==0 and arguments['CL']=='g'):
-      print("With granular classes (CL='g'), the number of sections, S, must be > 0.".format(arguments['CL']))
+    elif (arguments['S']==0 and (arguments['CL']=='g' or arguments['CL']=='m')):
+      print("With granular classes (CL='g' or 'm'), the number of sections, S, must be > 0.".format(arguments['CL']))
       print("Program terminating.")
       sys.exit(1)
+    if arguments['CL']=='m': # use m (manual) only for user context. is g inside
+      arguments['CL']='g'
+    if arguments['CL']=='a': # use a (auto) only for user context. is d inside
+      arguments['CL']='d'
   #if ('DT' in arguments):
   #  if file does not exist
   ## float values:
-  if ('G' in arguments):
-    if arguments['G']==0:
-      print("With granular classes (CL='g'), the granularity, G, must be > 0.".format(arguments['CL']))
+  if ('B' in arguments):
+    if arguments['B']==0:
+      print("With granular classes (CL='g' or 'm'), the number of bricks, B, must be > 0.".format(arguments['CL']))
       print("Program terminating.")
       sys.exit(1)
     else:
-      arguments['G'] = float(arguments['G'])
+      arguments['B'] = int(arguments['B'])
   printArgs(arguments)
   return arguments

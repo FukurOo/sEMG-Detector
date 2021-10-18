@@ -38,7 +38,7 @@ def preProcess(options,DIR_PATH='TEST/'):
   if (options['CL']=='d'):
     CL="ClassDefinition_direct/"
   else:
-    CL="ClassDefinition_granularity_"+str(options['G'])+"/"
+    CL="ClassDefinition_granular_"+str(options['B'])+"_bricks/"
   S="NumberOfSections_"+str(options['S'])+"/"
   EP="NumberOfEpochs_"+str(options['EP'])+"/"
   TS="NumberOfTimeSteps_"+str(options['TS'])+"/"
@@ -53,7 +53,7 @@ def preProcess(options,DIR_PATH='TEST/'):
   
   return raw_data,relative_file_path
   
-def postProcess(relative_file_path,history,model):
+def postProcess(relative_file_path,history,model,scene_mapping):
   #print(history.history.keys())
   
   plt.plot(history.history['accuracy'])
@@ -79,6 +79,9 @@ def postProcess(relative_file_path,history,model):
   
   model.save(relative_file_path+"/model")
   utils.plot_model(model, to_file=(relative_file_path+"/model.png"))
+  
+  scene_file_name = relative_file_path+"/scene_mapping.pickle"
+  pickle.dump(scene_mapping, open(scene_file_name, "wb"))
   
   print("\n\n\n\n\n\n\n")
   print("Finishing up. Proceede by executing '. ./execute-me.sh <outfile>'.")

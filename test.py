@@ -47,4 +47,8 @@ for i in daten:
 #        print('hallo du')
 
 
+
+
 print("Lily")
+print('Lisa')
+print("Max")

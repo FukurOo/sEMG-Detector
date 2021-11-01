@@ -45,3 +45,6 @@ for i in daten:
 #        daten[i,j].show()
 #        daten[i,j].analyse()
 #        print('hallo du')
+
+
+print('Lisa')

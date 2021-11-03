@@ -51,6 +51,9 @@ def preProcess(options,DIR_PATH='TEST/'):
   
   raw_data = pickle.load(open(options['DT'], "rb"))
   
+  if type(raw_data[0]) == list: # depending on the data creator, we saved stuff too encapsulated. done so in data_creator_001. This needs better attention in the future.
+    raw_data = raw_data[0]
+  
   return raw_data,relative_file_path
   
 def postProcess(relative_file_path,history,model,scene_mapping):

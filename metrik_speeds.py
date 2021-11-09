@@ -33,7 +33,7 @@ for i in range(np.shape(daten)[0]):
 #Histogramm
 #@ToDo: mehr x-Werte anzeigen für bessere Lesbarkeit der Geschwindigkeiten
 #@ToDo: ggf statt der 4 in i/4 die #speeds-1 als Wert nehmen
-n, bins, patches = plt.hist(speeds, bins = [i/4 for i in range(42)])
+n, bins, patches = plt.hist(speeds, bins = [i/29 for i in range(292)])
 #Ausgabe der Häufigkeit aller Geschwindigkeiten im Terminal
 print('[Geschwindigkeit,Häufigkeit]')
 print([[bins[i], n[i]] for i in range(len(bins)-1)])

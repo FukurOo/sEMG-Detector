@@ -21,12 +21,12 @@ def get_gaps(N,s,l):
     #print(gap_lengths)
     return gap_lengths
 
-def get_scenarios_with_fixed_wavelength(N_speeds,lambda_,world,dt=1/2048,N_electroids=16,len_=0.075,crit=0.0):
+def get_scenarios_with_fixed_wavelength(N_speeds,lambda_,world,dt=1/2048,N_electroids=16,len_=0.075,crit=0.0, start=1.0, end=10.0):
   scenario = []
   id = 0
   max_size = 0
   gap_vec = np.arange(0)
-  for speed in np.linspace(1.0,10,N_speeds):
+  for speed in np.linspace(start,end,N_speeds):
     if id==0:
       #AllOthersShouldBeLessThanThisIfPossible = math.ceil(2*(len_+lambda_)/speed/dt)+math.ceil((len_+2*lambda_+len_+lambda_)/speed/dt)
       gap_vec = get_gaps(7,lambda_/250,len_)
@@ -60,4 +60,3 @@ def get_scenarios_with_fixed_wavelength(N_speeds,lambda_,world,dt=1/2048,N_elect
       print("computing with speed {} and wavelength {}.".format(speed,lambda_))
     id += 1
   return scenario
-  

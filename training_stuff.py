@@ -50,7 +50,7 @@ def getClasses(numberOfBricks,numberOfSections):
     getClasses(2,2) = {0:(0,0),1:(0,1),2:(1,0),3:(2,0),4:(0,2),5:(1,1)}
   (is in no way sorted)
   '''
-  
+
   class myKey:
     '''
     zur Berechnung bauen wir einen Baum an Zuständen auf. die Zustände sind
@@ -237,6 +237,9 @@ def classify(list_of_dicts,training_opts):
   classMapping = getClasses(trop_b,trop_s)
   backwardsMap = {classMapping[el]: el for el in classMapping}
 
+  # hierin können wir die Verteilung der Input-Daten auf die existierenden Klassen schreiben.
+  # aktuell nicht benötigt, bzw. keine Weiterverarbeitung.
+  classDistribution = np.ndarray([NoC],dtype='int')*0
   #print(backwardsMap)
 
 ### Die metadaten enthalten beide versionen, p und i zeitlgleich als metaObject.pData_ und metaObject.iData_
@@ -251,9 +254,10 @@ def classify(list_of_dicts,training_opts):
     #print(WavesPerSection)
     className = tuple(WavesPerSection)
     classNumber = backwardsMap[className]
+    classDistribution[classNumber] += 1
     output[i][classNumber] = 1
   
-  #print(output)
+    #print(output)
   
   return output,maxW,NoC,classMapping
 
@@ -339,32 +343,21 @@ def getTrainingData(data_array,training_opts):
   x_train = np.vstack((x_train,x_temp[3::5]))
   x_validation = x_temp[4::5].copy()
   ##
-  #print(y_temp.shape)
   y_train = np.stack(y_temp[::5])
-  #print(y_train.shape)
   y_train = np.vstack((y_train,y_temp[1::5]))
-  #print(y_train.shape)
   y_train = np.vstack((y_train,y_temp[2::5]))
-  #print(y_train.shape)
   y_train = np.vstack((y_train,y_temp[3::5]))
-  #print(y_train.shape)
-  #print()
   y_validation = y_temp[4::5].copy()
   ##
-  #print(velocity_Ids_sorted.shape)
   velIds_train = np.stack(velocity_Ids_sorted[::5])
-  #print(velIds_train.shape)
   velIds_train = np.vstack((velIds_train,velocity_Ids_sorted[1::5]))
-  #print(velIds_train.shape)
   velIds_train = np.vstack((velIds_train,velocity_Ids_sorted[2::5]))
-  #print(velIds_train.shape)
   velIds_train = np.vstack((velIds_train,velocity_Ids_sorted[3::5]))
-  #print(velIds_train.shape)
   velIds_validation = velocity_Ids_sorted[4::5].copy()
   
   # something went wrong... some have shape=( ... ,1)  with unnecessary last dimension  ##NOT SO SURE ABOUT THIS! THIS DIMENSION MIGHT BE NECESSARY FOR KERAS!
   # for now, kill this dimension..
-  #ToDo: eliminate reason and get rid of this reshaping
+  #ToDo: eliminate reason and get rid of this reshaping. What are the cases, this occurs, and when not? This is very ugly here.
   for a in [x_train,x_validation]:#,velIds_train,velIds_validation]:  not working for the last two..
     shrinkToSize = len(a.shape)-1
     a = a.reshape([a.shape[i] for i in range(shrinkToSize)])
@@ -378,7 +371,8 @@ def getTrainingData(data_array,training_opts):
 def trainNeuralNetwork(pic_shape,training_data,valdtn_data,num_classes,training_opts):
   inputs = keras.Input(shape=(pic_shape[0],pic_shape[1],1))
   
-### TODO: hier bin ich. muss NN variieren.
+### TODO: aufräumen. Struktur für Steuerung von Klassifizierung oder Regression ?!
+###       1) Ordnung schaffen,  2) Regressionsmodelle entwerfen.
   x=inputs
   outputs = None
   if training_opts['AR']==0:
@@ -391,22 +385,41 @@ def trainNeuralNetwork(pic_shape,training_data,valdtn_data,num_classes,training_
     x = layers.MaxPooling2D(pool_size=(3, 3))(x)
     x = layers.GlobalAveragePooling2D()(x)
     outputs = layers.Dense(num_classes, activation='softmax')(x)
+  elif training_opts['AR']==2:
+    conv1 = layers.Conv2D(filters=32, kernel_size=(3, 3),padding='valid',activation=None)(x) # https://keras.io/examples/timeseries/timeseries_classification_from_scratch/ uses ReLU activation, but we already have values larger 0!
+    
+    conv2 = layers.Conv2D(filters=32, kernel_size=(1, 3),padding='valid',activation=None)(conv1)
+    conv2 = keras.layers.BatchNormalization()(conv2)
+    conv2 = keras.layers.ReLU()(conv2)
+    
+    conv3 = layers.Conv2D(filters=32, kernel_size=(1, 3),padding='valid',activation=None)(conv2)
+    conv3 = keras.layers.BatchNormalization()(conv3)
+    conv3 = keras.layers.ReLU()(conv3)
+    
+    gap = keras.layers.GlobalAveragePooling2D()(conv3)
+    
+    outputs = layers.Dense(num_classes, activation='softmax')(gap)
+  #elif training_opts['AR']==3:
+    
+    
 ###
   model = keras.Model(inputs=inputs, outputs=outputs)
   model.summary()
   
+  ########## MÖGLICHE VARIATION: optimizers SGD, Adam, Adadelta, Adagrad, 
   ########## MÖGLICHE VARIATION: learning_rate
-  optim = keras.optimizers.RMSprop(learning_rate=1e-3)
+  #optim = keras.optimizers.RMSprop(learning_rate=1e-3)
+  optim = keras.optimizers.Adadelta(learning_rate=1e-3)
   
   ########## MÖGLICHE VARIATION: keras.losses.CategoricalCrossentropy()
   lss = keras.losses.CategoricalCrossentropy() #keras.losses.MeanSquaredError()
   
   ########## MÖGLICHE VARIATION: metrics?
-  model.compile(optimizer=optim,loss=lss, metrics=['accuracy'])
+  model.compile(optimizer=optim,loss='mse', metrics = [keras.metrics.CategoricalAccuracy()])# loss = lss, metrics=['accuracy'])
   
   # compute NN and store the progress for eventual use, later.
   ########## MÖGLICHE VARIATION: batch_size
-  history = model.fit(training_data[0],training_data[1],batch_size=512,epochs=training_opts['EP'], validation_data = valdtn_data)
+  history = model.fit(training_data[0],training_data[1],batch_size=1024,epochs=training_opts['EP'], validation_data = valdtn_data)
   
   return history, model
 
@@ -439,16 +452,18 @@ def investigate(model,valData,step_size,noB,scene_mapping):
     #print(processed_data)
     class_i = np.argmax(processed_data[0])
     reference_class = np.argmax(y_validation[num])
+    #print("")
     print("NN Class predicted: {}, with {:.1f}% certainty.".format(class_i,100*np.max(processed_data[0])))
     P_ref = processed_data[0][reference_class]
     print("reference solution: {} (would have had {:.1f}% probability).".format(reference_class,P_ref*100))
+    #print("control sum: {}".format(sum(processed_data[0])))
     #print(processed_data[0])
     #print("y_validation: \n {}".format(y_validation[num]))
     predictedClassName = classMap[class_i]
     TrueClassName = classMap[reference_class]
     originalDicct = groundtruths[velIds_validation[num][0]]
     wave_info = originalDicct,maxW
-    if reference_class != 0:
+    if reference_class != 0 or class_i != 0:
       showClass(predictedClassName,noB,TrueClassName,wave_info)
 
 def showClass(name,noOfBricks,truth=False,originalWaves=False):

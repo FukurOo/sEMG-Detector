@@ -1,4 +1,4 @@
-#Beschreibung: Metrik misst wie oft welche Geschwindigkeit mit einer manuell festgelegten
+#Beschreibung: Metrik misst wie oft welche Geschwindigkeit gleichzeitig mit einer manuell festgelegten
 # zu prüfenden Geschwindigkeit in einem Datensatz auftritt
 # Nur sinnvoll bei Daten, die von creator_002 erzeugt wurden
 
@@ -9,21 +9,34 @@ import matplotlib.pyplot as plt
 import itertools
 
 
-#Variablen Datensatzes erzeut von data_creator_00x übergeben
+#Variable x des Datensatzes erzeut von data_creator_00x übergeben
+#oder des ganzen Dateiname eines Datensatzes
+#Was übergeben wurde wird in der nächsten if-Abfrage überprüft
 creator = str(sys.argv[1])
-n_speeds = str(sys.argv[2])
-n_waveLengths = str(sys.argv[3])
-#@TODO: was ist der grow_factor? eventuell variabel machen
-grow_factor = 4
+
+#Dateiname oder 'Kennzahlen'
+if len(creator) > 4:
+    input = creator
+    #@TODO: n_speeds extrahieren
+
+#Variablen Datensatzes erzeut von data_creator_00x übergeben
+else:
+    creator = creator
+    n_speeds = str(sys.argv[2])
+    n_waveLengths = str(sys.argv[3])
+    #@TODO: grow_factor eventuell variabel machen
+    grow_factor = 4
+
+    #je nach creator den passenden Dateinamen nutzen
+    if creator == '1':
+        input = "DATA/creator_001/RawData_"+str(n_speeds)+"_velocities___"+str(n_waveLengths)+"_waveLengths.pickle"
+    else:
+        input = "DATA/creator_002/RawData_"+str(n_speeds)+"_velocities___"+str(n_waveLengths)+"_waveLengths___grow_factor_"+str(grow_factor)+".pickle"
+
 
 pruef_speed = str(sys.argv[4])
 pruef_speed = float(pruef_speed)
 
-#je nach creator den passenden Dateinamen nutzen
-if creator == '1':
-    input = "DATA/creator_001/RawData_"+str(n_speeds)+"_velocities___"+str(n_waveLengths)+"_waveLengths.pickle"
-else:
-    input = "DATA/creator_002/RawData_"+str(n_speeds)+"_velocities___"+str(n_waveLengths)+"_waveLengths___grow_factor_"+str(grow_factor)+".pickle"
 
 
 #zum Datensatz gehörendes pickle Dokument wird geladen

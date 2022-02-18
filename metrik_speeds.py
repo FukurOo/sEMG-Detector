@@ -6,7 +6,7 @@ import sys
 import matplotlib.pyplot as plt
 
 
-#Variable x des Datensatzes erzeut von data_creator_00x übergeben
+#Variable x des Datensatzes erzeugt von data_creator_00x übergeben
 #oder des ganzen Dateiname eines Datensatzes
 #Was übergeben wurde wird in der nächsten if-Abfrage überprüft
 creator = str(sys.argv[1])

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from tensorflow.keras import utils
 #import subprocess
 import os
+from update_dataFile import convert_file
 
 def mkdirP(mypath):
     '''Creates a directory. equivalent to using mkdir -p on the command line'''
@@ -50,7 +51,7 @@ def preProcess(options,DIR_PATH='TEST/'):
   mkdirP(relative_file_path)
   
   raw_data = pickle.load(open(options['DT'], "rb"))
-  
+  raw_data = raw_data["content"]
   if type(raw_data[0]) == list: # depending on the data creator, we saved stuff too encapsulated. done so in data_creator_001. This needs better attention in the future.
     raw_data = raw_data[0]
   

@@ -106,6 +106,8 @@ import sys
 #import os
 import random
 
+from update_dataFile import convert_data, convert_file
+
 
 if len(sys.argv)  < 2:
   raise Warning("Please specify the number of speeds and wavelengths. (Data sets must already exist in the DATA/creator_001/ directory.)")
@@ -120,9 +122,12 @@ n_waveLengths = int(sys.argv[2])
 file_name = "DATA/creator_001/RawData_"+str(n_speeds)+"_velocities___"+str(n_waveLengths)+"_waveLengths.pickle"
 # load it
 scenarios = []
-with open(file_name, "rb") as f:
-  scenarios = pickle.load(f)
+convert_file(file_name)
 
+with open(file_name, "rb") as f:
+  daten = pickle.load(f)
+  scenarios = np.array(daten["content"])
+  print(scenarios)
 # lengths = np.linspace(0.01,0.10,n_waveLengths)
 
 # 1.: getmax number of waves in data set:
@@ -293,6 +298,7 @@ number_of_fails_in_a_row = 0
 n_allowed_fails = 10
 
 while len(all_scenarios) < n_scenarios_to_be_produced + n_base:
+
   # put them together in a clever way:
   # choose two "uniquely chosen" (random but reproducable)
   # using np.random.choice here, since random.choice does not allow for seeding!
@@ -308,6 +314,7 @@ while len(all_scenarios) < n_scenarios_to_be_produced + n_base:
   random_tries=0
   # make sure they satisfy the "distinguishabilty-condition"
   while not compatible(random_scenario1,random_scenario2):
+        
     random_tries+=1
     # we have to search another one. we try to minimize the total amount of waves,
     # so we skip the one with the most waves.
@@ -341,6 +348,8 @@ if number_of_fails_in_a_row <= n_allowed_fails:
 # get unique and descriptive name for the new file
 file_name = "DATA/creator_002/RawData_"+str(n_speeds)+"_velocities___"+str(n_waveLengths)+"_waveLengths___grow_factor_"+str(grow_factor)+".pickle"
 # save it
+all_scenarios = convert_data(all_scenarios)
+
 with open(file_name, "wb") as f:
   pickle.dump(all_scenarios, f)
 

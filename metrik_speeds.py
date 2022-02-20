@@ -36,13 +36,13 @@ f = open(input, 'rb')
 daten = pickle.load(f)
 
 
-daten = np.array(daten)
-
-#bei 001 gibts pro scenario genau eine Geschwindigkeiten
+daten = np.array(daten["content"])
+print(daten)
+#bei 001 gibts pro scenario genau eine Geschwindigkeit
 #bei 002 kann es bis zu (grow_factor_4?) 4 pro scenario geben
 
 
-#Format des arrays in dem die scenarios gespeiechert sind prüfen und 1-dimensional machen
+#Format des arrays in dem die scenarios gespeichert sind prüfen und 1-dimensional machen
 if daten.ndim != 1:
     daten = daten.flatten()
 

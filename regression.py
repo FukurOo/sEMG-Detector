@@ -39,7 +39,7 @@ Created on Thu Apr  8 10:55:11 2021
 # %%
 '''
 Ausführung des Programms:
- $ python3 main.py <arg list>
+ $ python3 regression.py <arg list>
 
  Um allerdings die Ausgabe auf das Terminal zu dokumentieren, ist man momentan
  auf hacks wie tee angewiesen:
@@ -68,10 +68,10 @@ import training_stuff as NN
 # which we are going to apply to a new neural network.
 
 #training_options = USER.processArguments()
-training_options = USER.getStandardArgumentList()
+training_options = USER.getRegressionArgumentList()
 USER.process(training_options)
 
-output_path = MMRY.preProcess(training_options,'MODELS/')
+output_path = MMRY.preProcess(training_options,'REGRESSION-MODELS/')
 
 network = NN.NeuralNetwork(training_options)
 

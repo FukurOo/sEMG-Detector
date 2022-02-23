@@ -262,10 +262,17 @@ def get_speeds(scenario):
   returns sorted list of contained speeds within the whole time range
   '''
   speeds=[]
-  for ts in range(scenario.data_.shape[0]):
-    for speed in scenario.meta_.iData_[ts].keys():
-      if speed not in speeds:
-        speeds.append(speed)
+  if isinstance(scenario,list): 
+    for spds in [get_speeds(scenario[i]) for i in range(len(scenario))]:
+      in_new = set(spds)
+      in_speeds = set(speeds)
+      in_second_but_not_in_speeds = in_new - in_speeds
+      speeds = speeds + list(in_second_but_not_in_speeds)
+  else:
+    for ts in range(scenario.data_.shape[0]):
+      for speed in scenario.meta_.iData_[ts].keys():
+        if speed not in speeds:
+          speeds.append(speed)
   return sorted(speeds)
   
 def compatible(scenario1,scenario2):
@@ -338,9 +345,13 @@ if number_of_fails_in_a_row <= n_allowed_fails:
   appr_gf = ((len(all_scenarios)-n_base)*chunk_size + total_timesteps[0])/total_timesteps[0]
   print("Completed task with grow factor = {} >= {}.\n\n".format(appr_gf,grow_factor))
 
+velocities = get_speeds(all_scenarios)
+
+format1 = {'content_tmp': all_scenarios, 'velocities': velocities, 'maxW': global_max}
+
 # get unique and descriptive name for the new file
 file_name = "DATA/creator_002/RawData_"+str(n_speeds)+"_velocities___"+str(n_waveLengths)+"_waveLengths___grow_factor_"+str(grow_factor)+".pickle"
 # save it
 with open(file_name, "wb") as f:
-  pickle.dump(all_scenarios, f)
+  pickle.dump(format1, f)
 

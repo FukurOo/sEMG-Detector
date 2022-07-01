@@ -139,7 +139,7 @@ def repairBricks(NNClass,NBricksOld,NBricksNew):
       currentErrorIndex += 1
   return retValue
 
-def classify(list_of_dicts,auto,n_bricks,n_sections,is_integer_interpretation,velocities):
+def classify(list_of_dicts,n_bricks,n_sections,is_integer_interpretation,velocities,waves_counted_probabilistic,maxW=0):
   '''
   In this method, we sort all dictionaries in list_of_dicts to their respective class.
   There are different encodings, according to the users preferences:
@@ -153,34 +153,16 @@ def classify(list_of_dicts,auto,n_bricks,n_sections,is_integer_interpretation,ve
   For example: dict1 = {1.0: 3, 3.33: 1, 6.66: 0, 10.0: 0} -- relates - to - class -->  (4,0)
   '''
   
-  if is_integer_interpretation:
-    raise Exception("CAUTION: probabilistic behaviour for classification tasks has never been tested! If you want to continue, please comment this line and procede accordingly!")
-    # especially you should have a look into what happens in basics.dictToArray().
+  assert is_integer_interpretation, "CAUTION: probabilistic behaviour for classification tasks has never been tested! If you want to continue, please comment this line and procede accordingly!"
+    # especially you should have a look at what happens in basics.dictToArray().
   
   # get the maximum number of waves that occurs in this list of dicts.
-  maxW = 0
-  length = len(list_of_dicts)
-  count = np.ndarray([length],dtype=np.int32)
-  for i in range(length):
-    count[i] = 0
-    for kel in list_of_dicts[i].keys():
-      if is_integer_interpretation:
-        count[i] += int(list_of_dicts[i][kel])
-      else: # probabilistic interpretation leads to a more complex data structure here:
-        count[i] += int(max(list_of_dicts[i][kel].keys()))
-    if count[i] > maxW:
-      maxW = int(count[i])
-      if type(maxW)!=type(2):
-        print("typ von maxW Zeile 174 falsch")
-  
-  if auto:
-    # identify the case that yields auto/direct behaviour: ==> numberOfBricks := maxWaves
-    # overwrite the users (probably not explicitly specified key)
-    old=n_bricks
+  if maxW == 0:
+    maxW = basics.maxwaves(list_of_dicts,waves_counted_probabilistic)
+        
+  if n_bricks == 0: # this is due to autoMode
     n_bricks = maxW
-    if old!= n_bricks:
-      print("Warning! Reset commandline argument (presumably number of bricks, B)")
-  
+    print("Warning: Setting number of Bricks (command line argument B) to {}".format(maxW))
   # calculate how many Classes there exist
   NoC = getNumberOfClasses(n_bricks,n_sections)
   classMapping = getClasses(n_bricks,n_sections)
@@ -192,6 +174,7 @@ def classify(list_of_dicts,auto,n_bricks,n_sections,is_integer_interpretation,ve
   #print(backwardsMap)
 
 ### Die metadaten enthalten beide versionen, p und i zeitlgleich als metaObject.pData_ und metaObject.iData_
+  length = len(list_of_dicts)
   output = np.zeros([length,NoC]) # output[i] is in R^{NoC}, either a one hot encoding (all zeros, but one 1) or a probability distribution (adds to one).
   # WIR VERZICHTEN (aus Zeitgründen) vorerst auf die probabilistischen Daten (die nicht-one-hot-NNs)
   for i,el in enumerate(list_of_dicts):
@@ -253,6 +236,48 @@ def investigate(model,valData,step_size,noB,scene_mapping):
     originalDicct = groundtruths[velIds_validation[num][0]]
     wave_info = originalDicct,maxW
     if reference_class != 0 or class_i != 0:
+      showClass(predictedClassName,noB,TrueClassName,wave_info)
+
+def investigate_new(model,network_info,step_size=1):
+  """
+    this function compares a models predictions to the validation data given in the network information
+    
+    model: the functional KERAS model.
+    network_info: dict or old tuple
+                  the parameters that were used to train this model. (training data is 'lost' but can be tracked back most probalby.)            
+  """
+  #import scenario as sc
+  assert isinstance(network_info,dict), "Don't use the new investigate routine!"
+    # we have everything in the new fashion:
+  x_validation,y_validation = network_info['valData']
+  classMap = network_info['SMap']
+  maxW = network_info['maxWaves']
+  velIds_validation = network_info['gtruth_id']
+  groundtruths = network_info['gtruth']
+  noB = network_info['NBricks']
+  
+  print(velIds_validation.shape)
+  #list(map('{:.3f}%'.format,y_validation[num]))
+  print("We will have a look on {} more or less random results.".format(len(np.arange(0,x_validation.shape[0],step_size))))
+  for num in range(0,x_validation.shape[0],step_size):
+    processed_data = model(x_validation[num:num+1])
+    #print(processed_data)
+    class_i = np.argmax(processed_data[0])
+    reference_class = np.argmax(y_validation[num])
+    #print("")
+    print("NN Class predicted: {}, with {:.1f}% certainty.".format(class_i,100*np.max(processed_data[0])))
+    P_ref = processed_data[0][reference_class]
+    print("reference solution: {} (would have had {:.1f}% probability).".format(reference_class,P_ref*100))
+    #print("control sum: {}".format(sum(processed_data[0])))
+    #print(processed_data[0])
+    #print("y_validation: \n {}".format(y_validation[num]))
+    predictedClassName = classMap[class_i]
+    TrueClassName = classMap[reference_class]
+    originalDicct = groundtruths[velIds_validation[num][0]]
+    wave_info = originalDicct,maxW
+    if reference_class != 0 or class_i != 0:
+      print("\npredicted Class Name: {}".format(predictedClassName))
+      print("number of bricks: {}".format(noB))
       showClass(predictedClassName,noB,TrueClassName,wave_info)
 
 def showClass(name,noOfBricks,truth=False,originalWaves=False):

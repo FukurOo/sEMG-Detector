@@ -11,9 +11,41 @@ basic functions that deal with:
 """
 import numpy as np
 
+def maxwaves(vlist,waves_counted_probabilistic = True):
+  '''
+  this function searches for the maximum amount of concurrently ocurring waves, regardless of their velocitiy
+  
+  there could be a faster version for "pure" Data (such as data produced by data_creator001). However we're not interested in speed here, and it's also a rare occasion..
+  
+  Parameters:
+    vlist:                      list of dicts
+                                every dict is the meta information to a specific picture. meaning, it could be a integer or probabilistic point of view velocity-count interpretation.
+    waves_counted_probabilistic:  optionalb, bool
+                                gibt an, auf welche Art und Weise die Daten interpreteiert werden sollen.
+                                Achtung: hängt vom Datenpfad ab, nicht von is_integer_interpretation!
+                              
+  '''
+
+  assert isinstance(vlist[0],dict), "Can't work with this argument!"
+  maxW = 0
+  length = len(vlist)
+  count = np.ndarray([length],dtype=np.int32)
+  for i in range(length):
+    count[i] = 0
+    for kel in vlist[i].keys():
+      if waves_counted_probabilistic: # probabilistic wave-counting leads to a more complex data structure here:
+        count[i] += int(max(vlist[i][kel].keys()))
+      else: # integer wave-counting
+        count[i] += int(vlist[i][kel])
+    #if count[i] > maxW:
+    #  maxW = int(count[i])
+  maxW = count.max()
+  return maxW
 
 def getSectionForVelocity(v,borders):
   # determine interval number that v belongs to:
+  if v > borders[-1] or v < borders[0]:
+    print("Warning: velocity out of bounds!")
   return borders.searchsorted(v - (borders[1]-borders[0])) + int(v in borders) - int(v==borders[0] or v==borders[-1])
 
 def dictToArray(dicct,numberOfSections,integer_behaviour,velocities): # diese funktion zählt die anzahl an wellen in den einzelnen sektionen. das ist also auch für die regression sinnvoll, da auch dort y_training und y_validation erzeugt werden müssen.
@@ -23,7 +55,7 @@ def dictToArray(dicct,numberOfSections,integer_behaviour,velocities): # diese fu
     * integer: f_i : \R^{N_v} --> \R^{N_s}
     * prob.:  f_p: DPD^{N_v} --> DPD^{N_s}, where DPD is some discrete prob. distr. (with at least one state).
   
-  integer_behaviour: true is default.
+  integer_behaviour: this parameter determines how addition of waves works. (aka DPDs)
   dicct: the amount of waves per contained velocity. Values are either \R^{N_v}
          or DPD^{N_v}, depending on use case (behaviour)
          Note: There are at max N_v velocities, not all of them are contained in every dicct. Also, N_v is unknown!  N_v will be made known through a sorted list of all velocities.
@@ -42,16 +74,8 @@ def dictToArray(dicct,numberOfSections,integer_behaviour,velocities): # diese fu
     
   N_s (usually is, but) does not have to be smaller than N_v.
   For regression tasks, N_s is by default N_v. Only if specified explicitly, it will be something else.
-  
-  ToDo: Implement probabilistic functinality.
-  
-  ToDo: get information of existing velocities! For now, we have to assume
-  that 1.0 is the smallest, and 10.0 is the largest velocity. If this is not
-  the case, ALL INTERVALS ARE PLACED WRONG!
   '''
-  
-  if not integer_behaviour:
-    raise Exception("ToDo: Implement probabilistic functinality!")
+  assert numberOfSections > 0, 'Odd case. probably not implemented well.'
   
   if velocities:
     vmin = velocities[0]
@@ -59,20 +83,31 @@ def dictToArray(dicct,numberOfSections,integer_behaviour,velocities): # diese fu
   else:
     vmin = 1.0
     vmax = 10.0
-  
-  retVal = [0]* numberOfSections
   borders=np.linspace(vmin,vmax,numberOfSections+1)
-  #if classification task or integer
-  for vel in dicct.keys():
-    s_i = getSectionForVelocity(vel,borders)
-    if integer_behaviour:
-      # add waves to section: (Note: for probabilistic behaviour (within the classification task) this must be some kind of a DPD addition!)
-      retVal[s_i] += dicct[vel]
-    else: # probabilistic regression task:
-    # this might crash for classification tasks or even run through, but produce wrong results. Could be right as well. need to check if ever used with classification task!      
-      for event in dicct[vel].keys():
-        retVal[s_i] += float(event)*dicct[vel][event]#  Add all discrete expected values (Erwartungswerte) of the velocities(E(v)). this is then the expected value of the associated Interval. (in this formula, we skip the explicit interim result E(v) and add to E(I) directly.)
-  return retVal
+  retVal = [0]* numberOfSections
+  
+  if integer_behaviour:
+  # integer point of view: we are working with destinct states (not with events)
+    for vel in dicct.keys():
+      s_i = getSectionForVelocity(vel,borders)
+      if integer_behaviour:
+        # add waves to section:
+        retVal[s_i] += dicct[vel]
+    return retVal
+  else:
+    # probabilistic point of view: we are working with DPDs (each discrete event has its probability)
+    tmp_dpd = [DPD()]*numberOfSections
+    for vel in dicct.keys():
+      s_i = getSectionForVelocity(vel,borders)
+      tmp_summand = DPD(dicct[vel])
+      tmp_dpd[s_i] += tmp_summand
+    for i in range(numberOfSections):
+      expected_value = 0
+      for event,probab in tmp_dpd[i].items():
+        expected_value += event*probab
+      retVal[i] = expected_value
+    #print(retVal)
+    return retVal
 
 ### TODO: wo wurde diese Funktion benutzt? ist sie in das Scenario-file gerutscht, wo sie eventuell hingehört?
 def P_N_waves_are_there(b):
@@ -95,3 +130,67 @@ def P_N_waves_are_there(b):
           t_new[m+n] = b[k[i]][m]*t_old[n]
     #print(t_new)
   return t_new
+
+
+# die folgende Klasse hätte auch in meta_stuff verwendet werden können. Jetzt drauf gesch... Verwendung aber in training_stuff und dergleichen.
+class DPD(dict):
+  '''
+    we use DPDs to describe how many waves of a specific velocity are in a domain.
+    to superpose two velocities we need to add two DPDs. This class allows us to do this very handy.
+    There's also a __mul__ version..
+  '''
+  def __init__(self, *args, **kwargs):
+    self.update(*args, **kwargs)
+  
+  def __getitem__(self, key):
+    val = dict.__getitem__(self, key)
+    #print('GET', key)
+    return val
+  
+  def __setitem__(self, key, val):
+    #print('SET', key, val)
+    dict.__setitem__(self, key, val)
+  
+  def __repr__(self):
+    dictrepr = dict.__repr__(self)
+    return '%s(%s)' % (type(self).__name__, dictrepr)
+        
+  def update(self, *args, **kwargs):
+    #print('update', args, kwargs)
+    for k, v in dict(*args, **kwargs).items():
+      #if not(isinstance(k,float) or isinstance(k,int) or isinstance(k,np.float64) or isinstance(k,np.int64)):
+      #  print("typ {} ist {}".format(type(k),k))
+      assert (isinstance(k,float) or isinstance(k,int) or isinstance(k,np.float64) or isinstance(k,np.int64)), "Not convertable into class DPD!"
+      self[k] = v
+      
+  def __add__(self,other):
+    assert isinstance(other, DPD), "Addition task unknown"
+    if len(self) == 0:
+      return other
+    elif len(other) == 0:
+      return self
+    else:
+      newDict = {}
+      for i in self.keys():
+        for j in other.keys():
+          if i+j not in newDict.keys():
+            newDict[i+j]=0
+          newDict[i+j] += self[i] * other[j]
+      # init and return new DPD:
+      #print(newDict.values())
+      assert np.isclose(np.sum(np.array([f for f in newDict.values()])),1), "DPD sum != 1. {}".format(np.sum(np.array(newDict.values())))
+      return DPD(newDict)
+  
+  def __mul__(self,other):
+    assert False, "Do you realy want to use this???" # Function works just fine, but there should not be a use for this!
+    assert isinstance(other, DPD), "Multiplication task unknown"
+    # init dict to initialize new DPD:
+    newDict={}
+    for i in self.keys():
+      for j in other.keys():
+        if (i*j) not in newDict.keys():
+          newDict[i*j] = 0
+        newDict[i*j] += self[i] * other[j]
+    # init and return new DPD:
+    assert np.isclose(np.sum(np.array(newDict.values())),1), "DPD sum != 1. {}".format(np.sum(np.array(newDict.values())))
+    return DPD(newDict)

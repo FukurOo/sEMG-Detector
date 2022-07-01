@@ -21,6 +21,8 @@ import numpy as np
 import pickle
 import sys
 
+from update_dataFile import convert_data
+
 n_speeds = int(sys.argv[1])
 # empfohlene Werte n in [2,30]
 
@@ -41,9 +43,15 @@ world = sc.Organizer()
 
 # returned object will hold artificial sEMG-data as well as raw meta-data, which describes the contained data.
 scenarios = [dct.get_scenarios_with_fixed_wavelength(n_speeds,lengths[i],world,1/2048,16,0.075,0.5) for i in range(n_waveLengths)]
-
+#print(scenarios[0][0].meta_.get_vecs())
+data = convert_data(scenarios)
+del scenarios
+data['wLengths'] = lengths
 # get unique and descriptive name for the file
 file_name = "DATA/creator_001/RawData_"+str(n_speeds)+"_velocities___"+str(n_waveLengths)+"_waveLengths.pickle"
 # save it
-pickle.dump(scenarios, open(file_name, "wb"))
+pickle.dump(data, open(file_name, "wb"))
+
+
+
 

@@ -63,23 +63,23 @@ Ausführung des Programms:
 import argument_stuff as USER
 import file_stuff as MMRY
 import training_stuff as NN
+import pickle
 
 # in the following dict, there are all the informations we need, to select the options
 # which we are going to apply to a new neural network.
 
-#training_options = USER.processArguments()
 training_options = USER.getRegressionArgumentList()
 USER.process(training_options)
 
-output_path = MMRY.preProcess(training_options,'REGRESSION-MODELS/')
+output_path = MMRY.preProcess(training_options,'REG_TEST/')
 
 network = NN.NeuralNetwork(training_options)
 
 #pic_shape, training_data, validation_data, number_of_classes, 
-scene_mapping  = network.getTrainingData()
+network.getTrainingData()
 
 #history,model 
-network.startTraining(training_options)#pic_shape,training_data,validation_data,number_of_classes,
+network.startTraining()#pic_shape,training_data,validation_data,number_of_classes,
 
 #NN.investigate(model,validation_data,2000, training_options['B'] ,scene_mapping)
 
@@ -87,6 +87,15 @@ network.startTraining(training_options)#pic_shape,training_data,validation_data,
 network.saveModel(output_path)
 
 
+
+
+network.saveMemorySpace(radical=True) # this deletes the original model and training data!
+
+print(network)
+
+with open(output_path+'/network_info.pickle', 'wb') as pfile:
+  #print(network.__dict__)
+  pickle.dump(network.__dict__, pfile,protocol=pickle.HIGHEST_PROTOCOL)
 
 
 

@@ -34,6 +34,7 @@ class InputPair:
     return self.value
     
   def setV(self,value):
+    # convert string input into type
     tmp = self.typo(value)
     try:
       if tmp in self.validOptions:
@@ -50,6 +51,9 @@ class InputPair:
     '''
     retV = self.name + str(self.value)
     return retV
+  
+  def __str__(self):
+    return str(self.value)
     
     
 def getStandardArgumentList():
@@ -100,7 +104,6 @@ def  printArgs(args):
 def process(arguments):
   N = len(arguments)  
   
-  print(arguments)
   if (len(sys.argv) != 2*N + 1):
     ii=0
     for el in sys.argv:
@@ -116,7 +119,7 @@ def process(arguments):
   
   for el in arguments.keys():
     if el in arg_map.keys():
-      print(el)
+      print(el,end=': ')
       print(arg_map[el])
       arguments[el].setV(arg_map[el])
   

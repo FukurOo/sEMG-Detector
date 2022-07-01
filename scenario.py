@@ -153,18 +153,37 @@ class Scenario:
     #print("meta data size after '__add__': {}".format(self.meta_.size_))
     #self.fin_[mySize:] = True
   
-  def maxWaves(self):
-    max_waves = 0
-    for ts in range(self.data_.shape[0]):
-      ts_max = 0
-      for key in self.meta_.pData_[ts].keys():
-        #print(self.meta_.pData_[ts])
-        #key is a specific speed. need to add all speed maxima
-        ts_max += max(self.meta_.pData_[ts][key].keys())
-      if ts_max > max_waves:
-        max_waves = ts_max
-    return max_waves
-
+  def maxWaves(self,count_waves_probabilistic=True,inform_when_large=False):
+    if (not count_waves_probabilistic) or inform_when_large:
+      max_waves_i = 0
+      for ts in range(self.data_.shape[0]):
+        ts_max_i = 0
+        #for key in self.meta_.pData_[ts].keys():
+        #  ts_max_i += int(self.meta_.iData_[ts][key])
+        for val in self.meta_.iData_[ts].values():
+          ts_max_i += int(val)
+        if ts_max_i > max_waves_i:
+          max_waves_i = ts_max_i
+    if count_waves_probabilistic or inform_when_large:
+      max_waves = 0
+      for ts in range(self.data_.shape[0]):
+        ts_max = 0
+        for speed in self.meta_.pData_[ts].values():
+          #key is a specific speed. need to add all speed maxima
+          ts_max += max(speed.keys()) # maximum over the list of all possible (P>0) numbers of occurrances.
+        assert isinstance(ts_max,int) or isinstance(ts_max,np.int64), "inconsistent use of key types somewhere"
+        #if np.abs(ts_max - ts_max_i) > 2:
+        #  print("Warning for these scenarios, the integer and probabilistic point of view on the maximum amount of concurrent waves differ strongly: {} vs {}".format(ts_max,ts_max_i))
+        if ts_max > max_waves:
+          max_waves = ts_max
+    if inform_when_large and np.abs(max_waves - max_waves_i) > 2:
+      print("Warning for these scenarios, the probabilistic and integer point of view on the maximum amount of concurrent waves differ strongly:\n probabilistic - {} vs {} - integer".format(max_waves,max_waves_i))
+      
+    if count_waves_probabilistic:
+      return max_waves
+    else:
+      return max_waves_i
+  
   def show(self,start=0,stop=0,colorbar=True):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')

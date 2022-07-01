@@ -9,6 +9,11 @@ class NeuralNetwork:
   '''
   instead of throwing around with variables in the code, we introduce this class.
   all relevant variables are then just easily accessible via this one common place.
+  
+  Frage: Wenn ein Modell gelade n wird. Ist dann nicht auch interessant, welches Netzwerk das Ding zustande bekommen hat?
+  Sprich: Ich schau mir doch ein Modell nur an, um zu sagen, ob das Netzwerk taugt, bzw. mehrere um zu sehen, was sich lohnt...
+  Also speichere ich ein Modell ab, inklusive des Netzwerks. Bzw. anstatt ein Modell zu öffnen, kann ich auch sagen - ich öffne ein Trainiertes Netzwerk und das Modell ist Teil von dem Netzwerk.
+  Damit habe ich zugriff auf alle einstellungen. So rum muss es glaub sein.
   '''
   
   def __init__(self,training_options):
@@ -19,19 +24,26 @@ class NeuralNetwork:
     ###TODO: anpassen. ist noch dict. jetzt soll aber InputPairs
     if 'AR' in training_options.keys():
       self.architecture = training_options['AR'].getV()
+    else: 
+      raise ValueError("architecture not specified!")
+    if 'EP' in training_options.keys():
+      self.epochs = training_options['EP'].getV()
+    else: 
+      raise ValueError("epochs not specified!")
     if training_options['CL'].getV() in ['r','n']:
       self.regression = True
       self.outputDimensionSize = training_options['S'].getV()
     else:
       self.regression = False
-      self.NBricks = training_options['B'].getV()
       self.NSections = training_options['S'].getV()
       if training_options['CL'].getV() in ['g','m']:
-        self.manualMode = True
+        #self.manualMode = True
         self.autoMode   = False
+        self.NBricks = training_options['B'].getV()
       elif training_options['CL'].getV() in ['d','a']:
         self.autoMode   = True
-        self.manualMode = False
+        self.NBricks = 0
+        #self.manualMode = False
     self.classification = not self.regression
     if training_options['GT'].getV() == 'i':
       self.integerDataInterpretation = True
@@ -41,6 +53,7 @@ class NeuralNetwork:
     self.inputDimension = [training_options['TS'].getV(),0] # set the first input dimension
     #
     raw_data = pickle.load(open(training_options['DT'].getV(), "rb")) ## a temporary file (read later again temporarily..)
+    self.tmp_wavecountis_prob = ('count_waves_hard' in training_options['DT'].getV())
     def myGet_dim(mylist):
       dim=[]
       while type(mylist) == type([]):
@@ -61,6 +74,7 @@ class NeuralNetwork:
       raw_data = data_as_dict.copy()
       del data_as_dict
     elif 'content_tmp' in raw_data.keys():
+      assert False, " Fall wird noch benötigt." # wenn das nie auftaucht, könnte man es gut löschen... =D stupid comment
       data_as_dict = {}
       data_as_dict['content'] = raw_data['content_tmp']
       data_as_dict['velocities'] = raw_data['velocities']
@@ -76,12 +90,39 @@ class NeuralNetwork:
       data_as_dict['dimension'] = myGet_dim(raw_data['content_tmp'])
       raw_data = data_as_dict.copy()
       del data_as_dict
+    elif 'content' in raw_data.keys():
+      raw_data['dimension'] = myGet_dim(raw_data['content'])
+      raw_data['vmin'] = raw_data['velocities'][0]
+      raw_data['vmax'] = raw_data['velocities'][-1]
+      if 'maxW' in raw_data.keys():
+        if isinstance(raw_data['maxW'],tuple):
+          raw_data['maxW'] = raw_data['maxW'][1-int(self.integerDataInterpretation)]
+        else:
+          raw_data['maxW'] = raw_data['maxW']
+      else:
+        raw_data['maxW'] = 0
+        print("Warning: Old Data version might be outdated.")
     self.raw_data = raw_data # delete this large object after creating complete training data !
     
-  
-  def saveMemorySpace(self):
+  def __str__(self):
+    ret = ''
+    ret += "inputDimension: {}\n".format(self.inputDimension)
+    try:
+      ret += "numberOfClasses: {}\n".format(self.numberOfClasses)
+    except:
+      print()
+    ret += "maxWaves: {}\n".format(self.maxWaves)
+    ret += "nVelocities: {}\n".format(self.nVelocities)
+    ret += "velocities: {}\n".format(self.velocities)
+    return ret
+    
+  def saveMemorySpace(self,radical=False):
     print("DELETING READ IN RAW DATA.")
     del self.raw_data
+    if radical:
+      del self.trnData
+      del self.model
+      del self.history
   
   def set_picShape(self,number):
     self.inputDimension[1] = number # set the second input dimension
@@ -91,8 +132,24 @@ class NeuralNetwork:
     self.trnData = data
     
   def set_validationData(self,data):
+    """
+      data: this is the shuffled data. So NOT the original.
+    """
     'test for the right structure here?'
     self.valData = data
+    
+  def set_traceback(self,IDs,g_truth=None):
+    """
+       Store information to trace the validation data back to
+       the original image
+       IDs: numpy list of integers.
+            the first entry contains the index of the original position.
+   g_truth: list of dicts
+            Every entry is a dictionary, containing the original meta information for frames [0,1,...].
+            IDs=[7,...] means: self.valData[0] is related to g_truth[7]
+    """
+    self.gtruth_id = IDs
+    self.gtruth = g_truth
     
   def set_numberOfClasses(self,number):
     if not self.classification:
@@ -105,22 +162,16 @@ class NeuralNetwork:
   
   def set_maxWaves(self,N):###TODO: soll in file der rohen Scenario data stehen. da raus lesen. nicht selbst berechnen.
     if self.raw_data['maxW'] != N and self.raw_data['maxW'] != 0:
+      assert False, "Determination of maxWaves odd! {} neq {}!".format(self.raw_data['maxW'], N)
       print("Warning: Determination of maximum number of waves seems to be odd! {} neq {}.".format(self.raw_data['maxW'], N))
     self.maxWaves = N
     
   def set_velocities(self,lst):
-    if lst:
-      self.velocities = lst
-      self.nVelocities = len(lst)
-      if self.raw_data['vmin'] != lst[0] or self.raw_data['vmax'] != lst[-1]:
-        print("Warning: Determination of minimum / maximum velocities seem to be odd! {} neq {} / {} neq {}.".format(self.raw_data['vmin'], lst[0], self.raw_data['vmax'], lst[-1]))
-      self.vmin = lst[0]
-      self.vmax = lst[-1]
-    else: 
-      self.velocities = False
-      self.nVelocities = False
-      self.vmin = 1.0
-      self.vmax = 10.0
+    self.velocities = lst
+    self.nVelocities = len(lst)
+    assert (self.raw_data['vmin'] == lst[0] and self.raw_data['vmax'] == lst[-1]),"Warning:Determination of minimum / maximum velocities seem to be odd! {} neq {} / {} neq {}.".format(self.raw_data['vmin'], lst[0], self.raw_data['vmax'], lst[-1])
+    self.vmin = lst[0]
+    self.vmax = lst[-1]
   
   def getTrainingData(self): # könnte auch setup() heißen
     '''
@@ -128,12 +179,13 @@ class NeuralNetwork:
     
     the standard might (but should preferably not) depend on which NN API is used (e.g. keras or pytorch)
     '''
-  
+
   # settings that are independent of the kind of task:
-    print(type(self.raw_data['content']))
-    print(self.raw_data['dimension'])
-    
-    
+    #print(type(self.raw_data['content']))
+    #print(self.raw_data['dimension'])
+    print("In den Daten enthaltene Geschwindigkeiten: {}".format(self.raw_data['velocities']))
+    self.set_velocities(self.raw_data['velocities'])
+    print("In den Daten enthaltene Maximalwellenzahl: {}".format(self.raw_data['maxW']))
     data_array = []
     if len(self.raw_data['dimension']) == 1:
       data_array = self.raw_data['content']
@@ -165,17 +217,21 @@ class NeuralNetwork:
       filled_elements = end
       for el in groundTruth:
         groundtruths.append(el)
-    
+   
   # settings that are dependent on the kind of task:
-    self.set_velocities(self.raw_data['velocities'])
+    #self.set_velocities(self.raw_data['velocities'])
     if self.classification: 
       import classification_task as clat
-      y_temp,maxWaves,number_of_classes,Map = clat.classify(groundtruths,self.autoMode,self.NBricks,self.NSections,self.integerDataInterpretation,self.velocities)
+      # so lange die creators noch nicht die neue maxWaves berechnung aus basics benutzen, muss im folgenden statement maxW = 0 (letztes Argument) stehen!
+      y_temp,maxWaves,number_of_classes,Map = clat.classify(groundtruths,self.NBricks,self.NSections,self.integerDataInterpretation,self.velocities,self.tmp_wavecountis_prob,self.raw_data['maxW'])
+      if self.autoMode:
+        self.NBricks = maxWaves
       self.set_numberOfClasses(number_of_classes)
       self.set_sceneMapping(Map)
     elif self.regression:
       import regression_task as regt
-      maxWaves,y_temp = regt.get_output(groundtruths,self.integerDataInterpretation,self.outputDimensionSize,self.velocities,0)# y_temp soll dimension haben: [Anzahl an Auswertungen, Anzahl an Regressions-Dimensionen (=self.outputDimensionSize)]
+      # so lange die creators noch nicht die neue maxWaves berechnung aus basics benutzen, muss im folgenden statement maxW = 0 (letztes Argument) stehen!
+      maxWaves,y_temp = regt.get_output(groundtruths,self.integerDataInterpretation,self.outputDimensionSize,self.velocities,self.tmp_wavecountis_prob,self.raw_data['maxW'])# y_temp soll dimension haben: [Anzahl an Auswertungen, Anzahl an Regressions-Dimensionen (=self.outputDimensionSize)]
     self.set_maxWaves(maxWaves)
       
     # keep track of mappings as well. so we have to shuffle the IDs the same way as the training data
@@ -217,12 +273,16 @@ class NeuralNetwork:
       
     self.set_trainingData((x_train,y_train))
     self.set_validationData((x_validation,y_validation))
+    if self.classification: 
+      self.set_traceback(velIds_validation,groundtruths)
+    else:
+      self.set_traceback(velIds_validation)
     ###TODO; maxWaves soll eigentlich vorher schon existieren, aber vielleicht sollte ich zunächst ermöglichen, dass es auch mit den datensätzen funktioniert, die das nicht kennen..
     ##  (Map,velIds_train,velIds_validation,groundtruths) makes the original waves still available for investigations
-    return (velIds_train,velIds_validation,groundtruths)
+    #return (velIds_train,velIds_validation,groundtruths)
 
   
-  def startTraining(self,training_opts):
+  def startTraining(self):
     '''
  about: NORMALIZATION
  from https://www.tensorflow.org/tutorials/keras/regression#linear_regression_with_multiple_inputs
@@ -282,7 +342,7 @@ class NeuralNetwork:
       print("model.output_shape is currently {}, and should be (None, {}).\n".format(model.output_shape,self.outputDimensionSize))
     elif self.architecture == 4:
       # idee hier: 1 filter für jede Geschwindigkeit
-      numberOfVelocities = self.nVelocities
+      numberOfVelocities = len(self.raw_data['velocities'])
       model = keras.Sequential()
       model.add(inputs)
       model.add(layers.Conv2D(filters=numberOfVelocities, kernel_size=(3, 3),padding='valid', activation="relu"))
@@ -309,12 +369,13 @@ class NeuralNetwork:
       model.compile(loss='mean_absolute_error', optimizer=keras.optimizers.Adam(0.001))#(loss='mae', optimizer='adam')
   # compute NN and store the progress for eventual use, later.
   ########## MÖGLICHE VARIATION: batch_size
-    self.history = model.fit(self.trnData[0],self.trnData[1],batch_size=1024,epochs=training_opts['EP'].getV(), validation_data = self.valData)
+    self.history = model.fit(self.trnData[0],self.trnData[1],batch_size=1024,epochs=self.epochs, validation_data = self.valData)
     self.model = model
   #end of function
 
 
   def saveModel(self,relative_file_path):
+    import pickle
     import matplotlib.pyplot as plt
     from tensorflow.keras import utils
     import os
@@ -340,34 +401,74 @@ class NeuralNetwork:
         print("WARNING: Unidentified key in network history.")
     
     if acc_key and val_acc_key:
-      plt.plot(self.history.history[acc_key])
-      plt.plot(self.history.history[val_acc_key])
-      plt.title('model accuracy')
-      plt.ylabel(acc_key)
-      plt.xlabel('epoch')
-      plt.legend(['train', 'test'], loc='upper left')
+      # base settings for figure size:
+      from matplotlib.pyplot import figure
+      figure(figsize=(6,4), dpi=80)
+      # summarize history for loss:
+      training_steps =self.history.history[acc_key] # shorter name
+      validation_steps=self.history.history[val_acc_key] # shorter name
+      plt.plot(training_steps,linewidth=3)
+      plt.plot(validation_steps,linewidth=1.8)
+      # save this data if needed again:
+      with open(relative_file_path+"/visualized_data.pkl", "wb") as f:
+        pickle.dump(((training_steps,validation_steps)), f)
+      # set all texts and labels:
+      plt.title('model accuracy',fontsize=28)
+      plt.ylabel(acc_key,fontsize=20)
+      plt.xlabel('epoch',fontsize=20)
+      plt.legend(labels=['train', 'test'], loc='upper left',fontsize=14)
+      plt.xticks(fontsize=12)# wuwu
+      plt.yticks(fontsize=12)# wuwu
       plt.savefig(relative_file_path+"/Accuracy")
       plt.savefig(relative_file_path+"/Accuracy.eps")
       plt.clf()
+      # inform console about final result
+      meean = sum(validation_steps[-3:])/3
+      print(meean)
+      with open(relative_file_path+"/reached_accuracy.txt", "x") as f:
+        f.write(str(meean))
       
     if loss_key and val_loss_key:
-      # summarize history for loss
-      plt.plot(self.history.history[loss_key])
-      plt.plot(self.history.history[val_loss_key])
-      plt.title('model loss')
-      plt.ylabel(loss_key)
-      plt.xlabel('epoch')
-      plt.legend(['train', 'test'], loc='upper left')
+      # base settings for figure size
+      from matplotlib.pyplot import figure
+      figure(figsize=(6,4), dpi=80) #12,7 auf poster, aber nachjustiert..
+      # summarize history for loss:
+      training_steps =self.history.history[loss_key] # shorter name
+      validation_steps=self.history.history[val_loss_key] # shorter name
+      plt.plot(training_steps,linewidth=3)
+      plt.plot(validation_steps,linewidth=1.8)
+      # save this data if needed again:
+      with open(relative_file_path+"/visualized_data.pkl", "wb") as f:
+        pickle.dump(((training_steps,validation_steps)), f)
+      # set all texts and labels:
+      plt.title('model loss',fontsize=28)
+      plt.ylabel(loss_key,fontsize=20)
+      #plt.ylabel('mean absolute error',fontsize=40)
+      plt.xlabel('epoch',fontsize=20)
+      plt.legend(fontsize=14,labels=['training', 'validation'], loc='upper right') # was left
+      plt.xticks(fontsize=12)# wuwu
+      plt.yticks(fontsize=12)# wuwu
       plt.savefig(relative_file_path+"/Loss")
       plt.savefig(relative_file_path+"/Loss.eps")
+      plt.show()
       plt.clf()
+      # inform user through console about final result and save in file:
+      meean = sum(self.history.history[val_loss_key][-3:])/3
+      print(meean)
+      with open(relative_file_path+"/reached_loss.txt", "x") as f:
+        f.write(str(meean))
   
     self.model.save(relative_file_path+"/model")
     utils.plot_model(self.model, to_file=(relative_file_path+"/model.png"))
   
-    if self.classification:
-      scene_file_name = relative_file_path+"/scene_mapping.pickle"
-      pickle.dump((self.SMap,self.valData), open(scene_file_name, "wb"))
+    #if self.classification:
+    #  scene_file_name = relative_file_path+"/scene_mapping.pickle"
+    #  pickle.dump((self.SMap,self.valData), open(scene_file_name, "wb"))
+    #else:
+    #  pickle.dump(self.valData, open(scene_file_name, "wb"))
+    #with open(scene_file_name, 'wb') as pfile:
+    #  pickle.dump(self, pfile,protocol=pickle.HIGHEST_PROTOCOL)
+  
   
     print("\n\n\n\n\n\n\n")
     print("Finishing up. Proceede by executing '. ./execute-me.sh <outfile>'.")
